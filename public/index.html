@@ -4,9 +4,204 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenAI Assistant Demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@1.13.0/dist/full.css" rel="stylesheet">
+
+    <style>
+        code {
+            background-color: #000;
+            color: #fff;
+            border-radius: 5px;
+            padding: 2px 4px;
+            font-family: 'Courier New', monospace;
+        }
+        #chat-container {
+            height: 70vh;
+        }
+
+        /* Estilos para el contenido markdown */
+        .assistant-answer-bubble {
+            line-height: 1.5;
+        }
+        
+        .assistant-answer-bubble p {
+            margin-bottom: 1rem;
+        }
+
+        .assistant-answer-bubble strong {
+            font-weight: 600;
+        }
+
+        .assistant-answer-bubble em {
+            font-style: italic;
+            color: #e2e8f0;
+        }
+
+        .assistant-answer-bubble ol {
+            list-style-type: decimal;
+            margin-left: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .assistant-answer-bubble ul {
+            list-style-type: disc;
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .assistant-answer-bubble li {
+            margin-bottom: 0.5rem;
+        }
+
+        .assistant-answer-bubble ol > li {
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        .assistant-answer-bubble ul > li {
+            font-weight: normal;
+        }
+
+        /* Ajustes para el contenedor de la burbuja */
+        .bg-blue-400 {
+            padding: 1rem !important;
+        }
+
+        /* Ajuste para listas anidadas */
+        .assistant-answer-bubble ol + ul {
+            margin-top: -0.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', async () => {
+        const sendQuestionBtn = document.getElementById('send-question-btn');
+        const chatContainerBubbles = document.getElementById('chat-container-bubbles');
+        const questionInput = document.getElementById('question-input');
+        const threadIdDisplay = document.getElementById('thread-id');
+        let threadId = null;
+
+        // Crear un nuevo thread al cargar la página
+        try {
+          const response = await fetch('/create-thread', {
+            method: 'POST'
+          });
+          const data = await response.json();
+          threadId = data.threadId;
+          console.log('Thread creado:', threadId);
+          threadIdDisplay.textContent = `Thread ID: ${threadId}`; // Mostrar versión corta del ID
+        } catch (error) {
+          console.error('Error al crear thread:', error);
+        }
+
+        questionInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                sendQuestionBtn.click();
+            }
+        });
+
+        sendQuestionBtn.addEventListener('click', async () => {
+            if (!threadId) {
+                console.error('No hay thread ID disponible');
+                return;
+            }
+
+            const questionInput = document.getElementById('question-input');
+            const question = questionInput.value;
+            const chatContainer = document.getElementById('chat-container');          
+
+            // Agregar pregunta del usuario
+            const userQuestion = document.createElement('div');
+            userQuestion.className = 'flex mb-2 justify-end';
+            userQuestion.innerHTML = `
+                <div class="mr-2">
+                    <div class="bg-gray-200 rounded-lg p-2">
+                        <p class="text-sm">${question}</p>
+                    </div>
+                </div>
+                <div class="flex-shrink-0">
+                    <img class="h-8 w-8 rounded-full" src="https://cdn-icons-png.flaticon.com/512/4079/4079259.png" alt="Usuario">
+                </div>
+            `;
+            chatContainerBubbles.appendChild(userQuestion);
+
+            // Preparar respuesta del asistente
+            const assistantAnswer = document.createElement('div');
+            assistantAnswer.className = 'flex mb-2';
+            assistantAnswer.innerHTML = `
+                <div class="flex-shrink-0">
+                    <img class="h-8 w-8 rounded-full" src="https://cdn-icons-png.flaticon.com/512/10479/10479785.png" alt="Asistente">
+                </div>
+                <div class="ml-2">
+                    <div class="bg-blue-400 text-white rounded-lg p-2">
+                        <p class="text-sm assistant-answer-bubble"></p>
+                    </div>
+                </div>
+            `;
+            chatContainerBubbles.appendChild(assistantAnswer);
+            const assistantAnswerBubble = assistantAnswer.querySelector('.assistant-answer-bubble');
+
+            // Iniciar stream
+            const eventSource = new EventSource(`/stream-chat/${threadId}?message=${encodeURIComponent(question)}`);
+
+            eventSource.addEventListener('start-chat', (event) => {
+                console.log('Chat iniciado');
+            });
+
+            eventSource.addEventListener('response-chat', (event) => {
+                const data = decodeURIComponent(event.data);
+                assistantAnswerBubble.innerText += data;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            });
+
+            eventSource.addEventListener('end-chat', (event) => {
+                console.log('Chat finalizado');
+                assistantAnswerBubble.innerHTML = marked.parse(assistantAnswerBubble.innerText);
+                eventSource.close();
+                questionInput.value = '';
+                questionInput.focus();
+            });
+
+            eventSource.addEventListener('error', (event) => {
+                console.error('Error en el stream:', event);
+                eventSource.close();
+            });
+        });
+      });
+    </script>
 </head>
 <body>
-    <h1>¡Hola Mundo!</h1>
-    <p>Esta es una demo de OpenAI Assistant API</p>
+    <div class="bg-gray-200 min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div class="bg-white rounded-lg shadow-lg p-6 mx-auto w-full max-w-4xl">
+            <div class="mb-4 flex justify-between items-center">
+              <h2 class="text-2xl font-bold">OpenAI Assistant Demo</h2>
+              <span id="thread-id" class="text-sm text-gray-500"></span>
+            </div>
+            <div id="chat-container" class="bg-gray-100 p-4 mb-4 rounded-lg overflow-y-auto">
+                <div id="chat-container-bubbles" class="flex flex-col">
+                    <div class="flex mb-2">
+                        <div class="flex-shrink-0">
+                            <img class="h-8 w-8 rounded-full" src="https://cdn-icons-png.flaticon.com/512/10479/10479785.png" alt="Asistente">
+                        </div>
+                        <div class="ml-2">
+                            <div class="bg-blue-400 text-white rounded-lg p-2">
+                                <p class="text-sm">¡Hola! Soy Barry, el asistente del Barcamp Piura AI 2025. ¿En qué puedo ayudarte hoy?</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center">
+                <input id="question-input" type="text" placeholder="Escribe tu pregunta..." 
+                    class="flex-grow border border-gray-300 rounded-md py-2 px-4">
+                <button id="send-question-btn" 
+                    class="ml-2 py-2 px-4 bg-blue-500 text-white font-semibold rounded-md hover:bg-blue-600">
+                    Enviar
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html> 
