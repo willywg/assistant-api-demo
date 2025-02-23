@@ -14,13 +14,8 @@ const { handleStreamChat, createThread } = require('./controllers/streamControll
 app.post('/create-thread', createThread);
 app.get('/stream-chat/:room_id', handleStreamChat);
 
-// Ruta para la API hello
-app.get('/api/hello', (req, res) => {
-  res.json({ message: '¡Hola desde la API!' });
-});
 
-// Ruta catch-all debe ir al final
-app.get('*', (req, res) => {
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
