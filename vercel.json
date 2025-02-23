@@ -4,12 +4,32 @@
     {
       "src": "api/index.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/stream-chat/(.*)",
+      "dest": "/api/index.js",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Connection": "keep-alive"
+      }
+    },
+    {
+      "src": "/create-thread",
       "dest": "/api/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/public/index.html"
     }
   ]
 } 
