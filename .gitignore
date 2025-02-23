@@ -1,0 +1,17 @@
+# Node modules
+node_modules/
+
+# Archivos de entorno
+.env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencias de producción
+package-lock.json
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
